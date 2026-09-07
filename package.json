@@ -1,0 +1,14 @@
+{
+  "name": "video-short",
+  "version": "1.0.0",
+  "description": "YouTube Shorts-style video streaming app with video copier utility",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "copier": "node copier.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}
