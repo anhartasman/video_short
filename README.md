@@ -1,6 +1,6 @@
 # Video Shorts
 
-A YouTube Shorts-style local video streaming web app, plus a utility to copy videos between folders.
+A YouTube Shorts-style local video streaming web app, plus a utility to copy or move videos between folders.
 
 ---
 
@@ -8,7 +8,7 @@ A YouTube Shorts-style local video streaming web app, plus a utility to copy vid
 
 - **Web Player** — Browse your local videos in a gallery, click to watch in a vertical shorts-style player
 - **Playback modes** — Toggle between Continue, Repeat, and Shuffle
-- **Video Copier** — Copy videos from one folder to another with optional size filtering
+- **Video Copier** — Copy or move videos from one folder to another with optional size filtering
 
 ---
 
@@ -33,13 +33,23 @@ cp .env.example .env
 SHORTS_PATH=./videos
 PORT=3000
 
-# Video copier
+# Video copier / mover
 ORIGIN_PATH=./source
 DESTINATION_PATH=./destination
 MAX_SIZE_MB=500
 ```
 
 Both relative and absolute paths are supported.
+
+---
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `npm start` | Start the web player |
+| `npm run copier` | Copy videos (originals kept) |
+| `npm run move` | Move videos (deleted from origin after transfer) |
 
 ---
 
@@ -78,20 +88,23 @@ Opens the app at `http://localhost:3000`.
 
 ---
 
-### Video Copier
+### Video Copier / Mover
 
 ```bash
-npm run copier
+npm run copier   # copy — originals are kept
+npm run move     # move — originals are deleted after transfer
 ```
 
-Reads `ORIGIN_PATH`, `DESTINATION_PATH`, and optionally `MAX_SIZE_MB` from `.env`.
+Both commands read `ORIGIN_PATH`, `DESTINATION_PATH`, and optionally `MAX_SIZE_MB` from `.env`.
 
 1. Scans the origin folder for video files
-2. Shows a summary — how many videos, total size, how many will be skipped
-3. Asks for confirmation before copying
-4. Shows a live progress bar as files are copied
+2. Shows a summary — mode, how many videos, total size, how many will be skipped
+3. Asks for confirmation before proceeding
+4. Shows a live progress bar as files are transferred
 
-If `MAX_SIZE_MB` is set, files larger than that limit are skipped. Leave it empty to copy all videos.
+If `MAX_SIZE_MB` is set, files larger than that limit are skipped. Leave it empty to transfer all videos.
+
+> **Note:** `npm run move` uses a fast atomic rename when origin and destination are on the same drive, and falls back to copy + delete automatically when moving across drives.
 
 ---
 

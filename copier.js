@@ -8,6 +8,7 @@ const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv'
 const ORIGIN_PATH      = process.env.ORIGIN_PATH      ? path.resolve(process.env.ORIGIN_PATH)      : null;
 const DESTINATION_PATH = process.env.DESTINATION_PATH ? path.resolve(process.env.DESTINATION_PATH) : null;
 const { MAX_SIZE_MB } = process.env;
+const MOVE_FILES = process.argv.includes('--move');
 
 if (!ORIGIN_PATH || !DESTINATION_PATH) {
   console.error('Error: ORIGIN_PATH and DESTINATION_PATH must be set in .env');
@@ -64,22 +65,26 @@ async function main() {
   const toSkip = allVideos.length - toCopy.length;
   const totalSize = toCopy.reduce((sum, v) => sum + v.size, 0);
 
-  console.log('\n--- Video Copy Summary ---');
+  const action = MOVE_FILES ? 'move' : 'copy';
+  const Action = MOVE_FILES ? 'Move' : 'Copy';
+
+  console.log(`\n--- Video ${Action} Summary ---`);
   console.log(`  Origin:      ${ORIGIN_PATH}`);
   console.log(`  Destination: ${DESTINATION_PATH}`);
+  console.log(`  Mode:        ${MOVE_FILES ? 'Move (delete from origin after transfer)' : 'Copy (keep originals)'}`);
   if (maxBytes !== null) console.log(`  Max size:    ${formatSize(maxBytes)}`);
-  console.log(`  Videos found:    ${allVideos.length}`);
-  console.log(`  Will be copied:  ${toCopy.length}`);
+  console.log(`  Videos found:      ${allVideos.length}`);
+  console.log(`  Will be ${action}d:  ${toCopy.length}`);
   if (toSkip > 0) console.log(`  Skipped (too large): ${toSkip}`);
-  console.log(`  Total copy size: ${formatSize(totalSize)}`);
-  console.log('--------------------------\n');
+  console.log(`  Total size: ${formatSize(totalSize)}`);
+  console.log('----------------------------\n');
 
   if (toCopy.length === 0) {
-    console.log('Nothing to copy.');
+    console.log(`Nothing to ${action}.`);
     return;
   }
 
-  const answer = await ask('Proceed with copy? [y/N] ');
+  const answer = await ask(`Proceed with ${action}? [y/N] `);
   if (answer.toLowerCase() !== 'y') {
     console.log('Aborted.');
     return;
@@ -90,19 +95,29 @@ async function main() {
     console.log(`\nCreated destination folder: ${DESTINATION_PATH}`);
   }
 
-  console.log('\nCopying files...');
-  let copied = 0;
+  console.log(`\n${Action}ing files...`);
+  let done = 0;
 
   for (const { file, fullPath, size } of toCopy) {
     const destPath = path.join(DESTINATION_PATH, file);
-    drawProgressBar(copied, toCopy.length);
-    fs.copyFileSync(fullPath, destPath);
-    copied++;
-    drawProgressBar(copied, toCopy.length);
+    drawProgressBar(done, toCopy.length);
+    if (MOVE_FILES) {
+      try {
+        fs.renameSync(fullPath, destPath);
+      } catch {
+        // cross-drive: fall back to copy + delete
+        fs.copyFileSync(fullPath, destPath);
+        fs.unlinkSync(fullPath);
+      }
+    } else {
+      fs.copyFileSync(fullPath, destPath);
+    }
+    done++;
+    drawProgressBar(done, toCopy.length);
     process.stdout.write(`  ← ${file} (${formatSize(size)})\n`);
   }
 
-  console.log(`\nDone. ${copied} file(s) copied.`);
+  console.log(`\nDone. ${done} file(s) ${action}d.`);
 }
 
 main().catch(err => { console.error(err.message); process.exit(1); });
