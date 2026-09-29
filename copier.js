@@ -1,6 +1,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const readline = require('readline');
 
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.mpeg', '.mpg']);
@@ -9,9 +10,17 @@ const ORIGIN_PATH      = process.env.ORIGIN_PATH      ? path.resolve(process.env
 const DESTINATION_PATH = process.env.DESTINATION_PATH ? path.resolve(process.env.DESTINATION_PATH) : null;
 const { MAX_SIZE_MB } = process.env;
 const MOVE_FILES = process.argv.includes('--move');
+const RENAME_FILES = process.argv.includes('--rename');
 
-if (!ORIGIN_PATH || !DESTINATION_PATH) {
-  console.error('Error: ORIGIN_PATH and DESTINATION_PATH must be set in .env');
+if (MOVE_FILES && RENAME_FILES) {
+  console.error('Error: --move and --rename cannot be used together.');
+  process.exit(1);
+}
+
+if (!ORIGIN_PATH || (!DESTINATION_PATH && !RENAME_FILES)) {
+  console.error(RENAME_FILES
+    ? 'Error: ORIGIN_PATH must be set in .env'
+    : 'Error: ORIGIN_PATH and DESTINATION_PATH must be set in .env');
   process.exit(1);
 }
 
@@ -53,6 +62,12 @@ function scanVideos(dir) {
     .filter(Boolean);
 }
 
+function createRenamedFile(file, index) {
+  const date = new Date().toISOString().slice(0, 10);
+  const uuid = crypto.randomUUID();
+  return `${date}-${uuid}${path.extname(file).toLowerCase()}`;
+}
+
 async function main() {
   const allVideos = scanVideos(ORIGIN_PATH);
 
@@ -65,13 +80,13 @@ async function main() {
   const toSkip = allVideos.length - toCopy.length;
   const totalSize = toCopy.reduce((sum, v) => sum + v.size, 0);
 
-  const action = MOVE_FILES ? 'move' : 'copy';
-  const Action = MOVE_FILES ? 'Move' : 'Copy';
+  const action = RENAME_FILES ? 'rename' : (MOVE_FILES ? 'move' : 'copy');
+  const Action = RENAME_FILES ? 'Rename' : (MOVE_FILES ? 'Move' : 'Copy');
 
   console.log(`\n--- Video ${Action} Summary ---`);
   console.log(`  Origin:      ${ORIGIN_PATH}`);
-  console.log(`  Destination: ${DESTINATION_PATH}`);
-  console.log(`  Mode:        ${MOVE_FILES ? 'Move (delete from origin after transfer)' : 'Copy (keep originals)'}`);
+  if (!RENAME_FILES) console.log(`  Destination: ${DESTINATION_PATH}`);
+  console.log(`  Mode:        ${RENAME_FILES ? 'Rename in origin (date + UUID)' : (MOVE_FILES ? 'Move (delete from origin after transfer)' : 'Copy (keep originals)')}`);
   if (maxBytes !== null) console.log(`  Max size:    ${formatSize(maxBytes)}`);
   console.log(`  Videos found:      ${allVideos.length}`);
   console.log(`  Will be ${action}d:  ${toCopy.length}`);
@@ -85,12 +100,13 @@ async function main() {
   }
 
   const answer = await ask(`Proceed with ${action}? [y/N] `);
-  if (answer.toLowerCase() !== 'y') {
+  const confirmed = answer.toLowerCase() === 'y';
+  if (!confirmed) {
     console.log('Aborted.');
     return;
   }
 
-  if (!fs.existsSync(DESTINATION_PATH)) {
+  if (!RENAME_FILES && !fs.existsSync(DESTINATION_PATH)) {
     fs.mkdirSync(DESTINATION_PATH, { recursive: true });
     console.log(`\nCreated destination folder: ${DESTINATION_PATH}`);
   }
@@ -99,9 +115,12 @@ async function main() {
   let done = 0;
 
   for (const { file, fullPath, size } of toCopy) {
-    const destPath = path.join(DESTINATION_PATH, file);
+    const destinationName = RENAME_FILES ? createRenamedFile(file, done) : file;
+    const destPath = path.join(DESTINATION_PATH, destinationName);
     drawProgressBar(done, toCopy.length);
-    if (MOVE_FILES) {
+    if (RENAME_FILES) {
+      fs.renameSync(fullPath, path.join(ORIGIN_PATH, destinationName));
+    } else if (MOVE_FILES) {
       try {
         fs.renameSync(fullPath, destPath);
       } catch {
@@ -114,7 +133,7 @@ async function main() {
     }
     done++;
     drawProgressBar(done, toCopy.length);
-    process.stdout.write(`  ← ${file} (${formatSize(size)})\n`);
+    process.stdout.write(`  ← ${file} → ${destinationName} (${formatSize(size)})\n`);
   }
 
   console.log(`\nDone. ${done} file(s) ${action}d.`);

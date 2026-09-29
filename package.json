@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "copier": "node copier.js",
-    "move": "node copier.js --move"
+    "move": "node copier.js --move",
+    "rename": "node copier.js --rename"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

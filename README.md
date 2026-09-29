@@ -50,6 +50,7 @@ Both relative and absolute paths are supported.
 | `npm start` | Start the web player |
 | `npm run copier` | Copy videos (originals kept) |
 | `npm run move` | Move videos (deleted from origin after transfer) |
+| `npm run rename` | Rename videos in origin to `YYYY-MM-DD-UUID` filenames |
 
 ---
 
@@ -88,14 +89,15 @@ Opens the app at `http://localhost:3000`.
 
 ---
 
-### Video Copier / Mover
+### Video Copier / Mover / Renamer
 
 ```bash
 npm run copier   # copy — originals are kept
 npm run move     # move — originals are deleted after transfer
+npm run rename   # rename videos in ORIGIN_PATH
 ```
 
-Both commands read `ORIGIN_PATH`, `DESTINATION_PATH`, and optionally `MAX_SIZE_MB` from `.env`.
+All three commands read `ORIGIN_PATH`, `DESTINATION_PATH`, and optionally `MAX_SIZE_MB` from `.env`. The rename command only changes filenames in `ORIGIN_PATH`; it does not use `DESTINATION_PATH`. Each filename becomes `YYYY-MM-DD-UUID` while keeping its original extension, for example `2026-09-28-550e8400-e29b-41d4-a716-446655440000.mp4`.
 
 1. Scans the origin folder for video files
 2. Shows a summary — mode, how many videos, total size, how many will be skipped
