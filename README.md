@@ -97,7 +97,7 @@ npm run move     # move — originals are deleted after transfer
 npm run rename   # rename videos in ORIGIN_PATH
 ```
 
-All three commands read `ORIGIN_PATH`, `DESTINATION_PATH`, and optionally `MAX_SIZE_MB` from `.env`. The rename command only changes filenames in `ORIGIN_PATH`; it does not use `DESTINATION_PATH`. Each filename becomes `YYYY-MM-DD-UUID` while keeping its original extension, for example `2026-09-28-550e8400-e29b-41d4-a716-446655440000.mp4`.
+All three commands read `ORIGIN_PATH`, `DESTINATION_PATH`, and optionally `MAX_SIZE_MB` from `.env`. The rename command only changes filenames in `ORIGIN_PATH`; it does not use `DESTINATION_PATH`. Each filename becomes `YYYY-MM-DD-UUID` while keeping its original extension, for example `2026-09-28-550e8400-e29b-41d4-a716-446655440000.mp4`. The date is the file's creation date (falling back to its last-modified date when creation time is unavailable), formatted in local time — not the date the command is run. Files that already match the `YYYY-MM-DD-UUID` pattern are skipped, so rename can be run repeatedly without touching them.
 
 1. Scans the origin folder for video files
 2. Shows a summary — mode, how many videos, total size, how many will be skipped

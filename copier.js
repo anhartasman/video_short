@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const readline = require('readline');
 
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.mpeg', '.mpg']);
+const RENAMED_PATTERN = /^\d{4}-\d{2}-\d{2}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const ORIGIN_PATH      = process.env.ORIGIN_PATH      ? path.resolve(process.env.ORIGIN_PATH)      : null;
 const DESTINATION_PATH = process.env.DESTINATION_PATH ? path.resolve(process.env.DESTINATION_PATH) : null;
@@ -56,14 +57,23 @@ function scanVideos(dir) {
       const ext = path.extname(file).toLowerCase();
       if (!VIDEO_EXTENSIONS.has(ext)) return null;
       const fullPath = path.join(dir, file);
-      const { size } = fs.statSync(fullPath);
-      return { file, fullPath, size };
+      const stat = fs.statSync(fullPath);
+      const created = stat.birthtimeMs > 0 ? stat.birthtime : stat.mtime;
+      const alreadyRenamed = RENAMED_PATTERN.test(path.basename(file, path.extname(file)));
+      return { file, fullPath, size: stat.size, created, alreadyRenamed };
     })
     .filter(Boolean);
 }
 
-function createRenamedFile(file, index) {
-  const date = new Date().toISOString().slice(0, 10);
+function formatLocalDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function createRenamedFile(file, created) {
+  const date = formatLocalDate(created);
   const uuid = crypto.randomUUID();
   return `${date}-${uuid}${path.extname(file).toLowerCase()}`;
 }
@@ -76,12 +86,15 @@ async function main() {
     return;
   }
 
-  const toCopy = allVideos.filter(v => maxBytes === null || v.size <= maxBytes);
-  const toSkip = allVideos.length - toCopy.length;
+  const sizeEligible = allVideos.filter(v => maxBytes === null || v.size <= maxBytes);
+  const toSkip = allVideos.length - sizeEligible.length;
+  const alreadyNamed = RENAME_FILES ? sizeEligible.filter(v => v.alreadyRenamed) : [];
+  const toCopy = RENAME_FILES ? sizeEligible.filter(v => !v.alreadyRenamed) : sizeEligible;
   const totalSize = toCopy.reduce((sum, v) => sum + v.size, 0);
 
   const action = RENAME_FILES ? 'rename' : (MOVE_FILES ? 'move' : 'copy');
   const Action = RENAME_FILES ? 'Rename' : (MOVE_FILES ? 'Move' : 'Copy');
+  const actionProgress = RENAME_FILES ? 'Renaming' : (MOVE_FILES ? 'Moving' : 'Copying');
 
   console.log(`\n--- Video ${Action} Summary ---`);
   console.log(`  Origin:      ${ORIGIN_PATH}`);
@@ -91,6 +104,7 @@ async function main() {
   console.log(`  Videos found:      ${allVideos.length}`);
   console.log(`  Will be ${action}d:  ${toCopy.length}`);
   if (toSkip > 0) console.log(`  Skipped (too large): ${toSkip}`);
+  if (alreadyNamed.length > 0) console.log(`  Already named correctly: ${alreadyNamed.length}`);
   console.log(`  Total size: ${formatSize(totalSize)}`);
   console.log('----------------------------\n');
 
@@ -111,11 +125,11 @@ async function main() {
     console.log(`\nCreated destination folder: ${DESTINATION_PATH}`);
   }
 
-  console.log(`\n${Action}ing files...`);
+  console.log(`\n${actionProgress} files...`);
   let done = 0;
 
-  for (const { file, fullPath, size } of toCopy) {
-    const destinationName = RENAME_FILES ? createRenamedFile(file, done) : file;
+  for (const { file, fullPath, size, created } of toCopy) {
+    const destinationName = RENAME_FILES ? createRenamedFile(file, created) : file;
     const destPath = path.join(DESTINATION_PATH, destinationName);
     drawProgressBar(done, toCopy.length);
     if (RENAME_FILES) {
